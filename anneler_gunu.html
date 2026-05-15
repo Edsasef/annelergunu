@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anneler Günü - Antigravity</title>
+    <!-- Modern Fontlar -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Poppins:wght@300;400;500&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color-1: #0a0f25;
+            --bg-color-2: #191970;
+            /* Gece mavisi (Midnight blue) */
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-color: #ffffff;
+            --accent-pink: #FFB6C1;
+            /* Yumuşak pembe */
+            --accent-gold: #FFD700;
+            /* Altın sarısı */
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--bg-color-1), var(--bg-color-2));
+            color: var(--text-color);
+            font-family: 'Poppins', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Canvas (Arka plan kalpleri için) */
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            /* Fare tıklamalarını canvas'tan geçirip karta ulaşmasını sağlar, 
+               ancak JS ile fareyi dinleyeceğimiz için pointer-events'i iptal etmiyoruz 
+               veya sadece body üzerinde dinleyebiliriz. */
+        }
+
+        /* Glassmorphism Merkez Parça */
+        .glass-panel {
+            position: relative;
+            z-index: 10;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 3.5rem 4rem;
+            text-align: center;
+            max-width: 800px;
+            width: 90%;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            /* Antigravity uçma animasyonu */
+            animation: float 6s ease-in-out infinite;
+            overflow: hidden;
+            pointer-events: none;
+            /* Kart farenin kalp etkileşimini engellemesin */
+        }
+
+        /* Cam üzerinden geçen hafif parlama efekti */
+        .glass-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.06), transparent);
+            transform: skewX(-20deg);
+            animation: shine 8s infinite;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-15px);
+            }
+
+            100% {
+                transform: translateY(0px);
+            }
+        }
+
+        @keyframes shine {
+            0% {
+                left: -100%;
+            }
+
+            20% {
+                left: 200%;
+            }
+
+            100% {
+                left: 200%;
+            }
+        }
+
+        /* Tipografi */
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.8rem;
+            font-weight: 700;
+            line-height: 1.4;
+            color: var(--text-color);
+            margin-bottom: 1rem;
+        }
+
+        .highlight-pink {
+            color: var(--accent-pink);
+            font-style: italic;
+        }
+
+        .highlight-gold {
+            color: var(--accent-gold);
+            text-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+        }
+
+        p.subtitle {
+            font-size: 1.1rem;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 300;
+            margin-top: 1.5rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* Mobil Uyum */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .glass-panel {
+                padding: 2rem 1.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <canvas id="canvas"></canvas>
+
+    <div class="glass-panel">
+        <h1>
+            Canım Annem,<br>
+            <span class="highlight-pink">Yerçekimi</span> Bile Sana Olan Sevgim Kadar <span class="highlight-gold">Güçlü
+                Değil!</span>
+        </h1>
+        <p class="subtitle">Anneler Günün Kutlu Olsunn!</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let particles = [];
+
+        // Fare (ve dokunma) etkileşimi
+        let mouse = {
+            x: null,
+            y: null,
+            radius: 180 // Kaçma etkisinin yarıçapı
+        };
+
+        window.addEventListener('mousemove', function (event) {
+            mouse.x = event.x;
+            mouse.y = event.y;
+        });
+
+        window.addEventListener('touchmove', function (event) {
+            mouse.x = event.touches[0].clientX;
+            mouse.y = event.touches[0].clientY;
+        });
+
+        window.addEventListener('mouseout', function () {
+            mouse.x = undefined;
+            mouse.y = undefined;
+        });
+
+        window.addEventListener('touchend', function () {
+            mouse.x = undefined;
+            mouse.y = undefined;
+        });
+
+        // Ekran boyutu değiştiğinde canvası güncelle
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Kalp çizim fonksiyonu
+        function drawHeart(ctx, x, y, size, color, opacity) {
+            ctx.save();
+            ctx.globalAlpha = opacity;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+
+            const topCurveHeight = size * 0.3;
+            ctx.moveTo(x, y + topCurveHeight);
+
+            // Sol üst kavis
+            ctx.bezierCurveTo(
+                x, y,
+                x - size / 2, y,
+                x - size / 2, y + topCurveHeight
+            );
+
+            // Sol alt kavis
+            ctx.bezierCurveTo(
+                x - size / 2, y + (size + topCurveHeight) / 2,
+                x, y + (size + topCurveHeight) / 2,
+                x, y + size
+            );
+
+            // Sağ alt kavis
+            ctx.bezierCurveTo(
+                x, y + (size + topCurveHeight) / 2,
+                x + size / 2, y + (size + topCurveHeight) / 2,
+                x + size / 2, y + topCurveHeight
+            );
+
+            // Sağ üst kavis
+            ctx.bezierCurveTo(
+                x + size / 2, y,
+                x, y,
+                x, y + topCurveHeight
+            );
+
+            ctx.closePath();
+            ctx.fill();
+
+            // Opsiyonel: Yumuşak bir parlama (glow) efekti
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 10;
+
+            ctx.restore();
+        }
+
+        // Parçacık (Kalp) Sınıfı
+        class Particle {
+            constructor() {
+                this.size = Math.random() * 25 + 10; // Boyut
+                this.x = Math.random() * width;
+                this.y = Math.random() * height + height; // Ekranın altından başla
+
+                // Antigravity yukarı süzülme hızı
+                this.speedY = Math.random() * -1.5 - 0.3;
+
+                // Sağa sola hafif salınım hızı
+                this.speedX = Math.random() * 1 - 0.5;
+
+                // Renkler: Yumuşak pembe, altın ve pastel varyasyonları
+                const colors = ['#FFB6C1', '#FFD700', '#FFF0F5', '#FFC0CB', '#FFE4E1'];
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+
+                // Şeffaflık
+                this.opacity = Math.random() * 0.6 + 0.1;
+
+                // Salınım için açısal değişkenler
+                this.angle = Math.random() * Math.PI * 2;
+                this.spin = (Math.random() - 0.5) * 0.02;
+            }
+
+            update() {
+                // Süzülme hareketi
+                this.y += this.speedY;
+                this.x += this.speedX + Math.sin(this.angle) * 0.5;
+                this.angle += this.spin;
+
+                // Fareden kaçma (İtme/Repulsion) Etkisi
+                if (mouse.x != null && mouse.y != null) {
+                    let dx = mouse.x - this.x;
+                    let dy = mouse.y - this.y;
+                    let distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < mouse.radius) {
+                        const forceDirectionX = dx / distance;
+                        const forceDirectionY = dy / distance;
+                        // Ne kadar yakınsa o kadar güçlü it
+                        const force = (mouse.radius - distance) / mouse.radius;
+
+                        const pushX = forceDirectionX * force * 5;
+                        const pushY = forceDirectionY * force * 5;
+
+                        this.x -= pushX;
+                        this.y -= pushY;
+                    }
+                }
+
+                // Ekranın üstünden çıkarsa altından geri başlat
+                if (this.y < -50) {
+                    this.y = height + 50;
+                    this.x = Math.random() * width;
+                    // Hızı yeniden rastgele belirle
+                    this.speedY = Math.random() * -1.5 - 0.3;
+                }
+
+                // Yanlardan çıkarsa diğer taraftan gir
+                if (this.x > width + 50) this.x = -50;
+                if (this.x < -50) this.x = width + 50;
+            }
+
+            draw() {
+                drawHeart(ctx, this.x, this.y, this.size, this.color, this.opacity);
+            }
+        }
+
+        // Başlatma ve Animasyon Döngüsü
+        function init() {
+            particles = [];
+            // Ekran genişliğine göre kalp sayısını ayarla
+            const particleCount = Math.min(Math.floor(window.innerWidth / 12), 120);
+
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+                // İlk açılışta kalpleri tüm ekrana dağıt
+                particles[i].y = Math.random() * height;
+            }
+        }
+
+        function animate() {
+            // Arka planı temizle
+            ctx.clearRect(0, 0, width, height);
+
+            // Tüm kalpleri güncelle ve çiz
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        init();
+        animate();
+    </script>
+</body>
+
+</html>
